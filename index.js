@@ -2,8 +2,10 @@ const express = require('express');
 const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require('dotenv').config();
+
+const stripe = require("stripe")(process.env.STRIPE_SK);
 
 const port = process.env.PORT || 8080;
 
@@ -67,6 +69,12 @@ async function run() {
             const result = await bookingCollection.insertOne(data);
             res.send(result)
         })
+        app.get('/allusers', async(req, res)=>{
+            const query = {}
+            const cursor =  userCollection.find(query)
+            const allusers = await cursor.toArray();
+            res.send(allusers);
+        })
         app.post('/user', async(req, res)=>{
             const data = req.body;
             const email = data.email;
@@ -89,6 +97,12 @@ async function run() {
         })
         app.get('/cars', async(req, res)=>{
             const query = {}
+            const cursor = carCollection.find(query).limit(6);
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+        app.get('/allCars', async(req, res)=>{
+            const query = {}
             const cursor = carCollection.find(query);
             const result = await cursor.toArray();
             res.send(result);
@@ -97,7 +111,7 @@ async function run() {
             const email = req.query.email;
             const query = { email: email}
             const verifiedJwtEmail = req.decoded.email;
-            console.log(verifiedJwtEmail);
+            
             if(verifiedJwtEmail === email){
                 const result  = await userCollection.findOne(query);
                 return res.send(result);
@@ -105,6 +119,55 @@ async function run() {
             else{
                 return res.status(401).json('Email not found!')
             }
+        })
+        app.delete('/revmoveUser/:id',verifyJWT, async(req, res)=>{
+            const id = req.params.id;
+            
+            const query = { _id: new ObjectId(`${id}`)}
+            const verifiedJwtEmail = req.decoded.email;
+            if(verifiedJwtEmail){
+                const result  = await userCollection.deleteOne(query);
+                return res.send(result);
+            }
+            else{
+                return res.status(401).json('Email not found!')
+            }
+        })
+        app.delete('/removeOrder/:id',verifyJWT, async(req, res)=>{
+            const id = req.params.id;
+            const query = { _id: new ObjectId(`${id}`)}
+            const verifiedJwtEmail = req.decoded.email;
+            if(verifiedJwtEmail){
+                const result  = await bookingCollection.deleteOne(query);
+                return res.send(result);
+            }
+            else{
+                return res.status(401).json('Email not found!')
+            }
+        })
+        app.get('/product/:id',async(req, res)=>{
+            const id = req.params.id;
+            const query = {
+                _id: new ObjectId(`${id}`)
+            }
+            const existBooking = await bookingCollection.findOne(query)
+                res.send(existBooking);
+        })
+        app.post('/create-payment-intent', async(req, res)=>{
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price*100;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'USD',
+                amount: amount,
+                "payment_method_types": [
+                    'card'
+                ]
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+              });
         })
 
     } catch (err) {
