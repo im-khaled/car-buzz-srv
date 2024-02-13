@@ -101,6 +101,14 @@ async function run() {
             const result = await cursor.toArray();
             res.send(result);
         })
+        app.get('/brand', async(req, res)=>{
+            const brands = req.query;
+            const {brandname} = brands;
+            const query = {brand: brandname}
+            const cursor = carCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result);
+        })
         app.get('/allCars', async(req, res)=>{
             const query = {}
             const cursor = carCollection.find(query);
